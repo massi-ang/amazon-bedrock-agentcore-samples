@@ -76,7 +76,7 @@ docstring-parser==0.17.0
     # via
     #   bedrock-agentcore-starter-toolkit
     #   strands-agents
-fonttools==4.59.2
+fonttools==4.61.0
     # via matplotlib
 frozendict==2.4.6
     # via yfinance
