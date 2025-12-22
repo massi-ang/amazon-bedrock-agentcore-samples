@@ -54,9 +54,11 @@ sample-concierge-agent/
 ## Data Flow
 ![shopping data flow](docs/shopping_data_flow.png)
 
-
 ## Architecture
 ![shopping arch](docs/Shopping_Agent_VISA.png)
+
+## Demo
+![Shopping Agent Demo](docs/demo.gif)
 
 ## Configuration
 
@@ -69,6 +71,6 @@ For detailed configuration including:
 
 See the **[Deployment Guide](DEPLOYMENT.md)**.
 
-## License
-
-This project is provided as a sample implementation for educational purposes, it is NOT PRODUCTION READY. Please ensure compliance with your organization's policies and AWS service terms.
+> [!NOTE]
+> This project is provided as a sample implementation for educational purposes, it is NOT PRODUCTION READY.
+>  Please ensure compliance with your organization's policies and AWS service terms.

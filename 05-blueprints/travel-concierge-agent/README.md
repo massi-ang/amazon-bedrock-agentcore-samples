@@ -89,6 +89,9 @@ See the [Deployment Guide](DEPLOYMENT.md#prerequisites) for detailed requirement
 ## Architecture
 ![travel arch](docs/Travel_Agent_VISA.png)
 
+## Demo
+![Travel Agent Demo](docs/demo.gif)
+
 ## Configuration
 
 ### API Keys (Optional)
@@ -115,6 +118,6 @@ See the [Deployment Guide - Clean Up](DEPLOYMENT.md#clean-up) for partial cleanu
 
 For detailed deployment instructions, troubleshooting, and configuration options, see the [Deployment Guide](DEPLOYMENT.md).
 
-## License
-
-This project is provided as a sample implementation for educational purposes, it is NOT PRODUCTION READY. Please ensure compliance with your organization's policies and AWS service terms.
+> [!NOTE]
+> This project is provided as a sample implementation for educational purposes, it is NOT PRODUCTION READY.
+>  Please ensure compliance with your organization's policies and AWS service terms.
