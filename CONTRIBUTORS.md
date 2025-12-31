@@ -90,3 +90,4 @@
 - Jerad Engebreth (jcengebreth)
 - Roberto Catalano
 - afarntrog
+- Massimiliano Angelino (massi-ang)
