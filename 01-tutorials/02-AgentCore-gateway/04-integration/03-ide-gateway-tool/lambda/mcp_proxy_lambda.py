@@ -24,9 +24,14 @@ def lambda_handler(event, context):
     """Main Lambda handler - routes requests based on path."""
     path = event.get("rawPath", event.get("path", "/"))
     method = event.get("requestContext", {}).get("http", {}).get("method", "GET")
-
+    print(event)
+    if method == "OPTIONS":
+        return {
+            "statusCode": 200,
+            "headers": {"Allow": "OPTIONS, GET, POST"},
+        }
     # Route to appropriate handler
-    if path == "/.well-known/oauth-authorization-server":
+    if path.startswith("/.well-known/oauth-authorization-server"):
         return handle_oauth_metadata(event)
     elif path == "/.well-known/oauth-protected-resource":
         return handle_protected_resource_metadata(event)
@@ -38,8 +43,12 @@ def lambda_handler(event, context):
         return handle_token(event)
     elif path == "/register" and method == "POST":
         return handle_dcr(event)
-    else:
+    elif path == "/mcp":
         return proxy_to_gateway(event)
+    else:
+        return {
+            "statusCode": 404,
+        }
 
 
 def handle_oauth_metadata(event):
@@ -62,25 +71,25 @@ def handle_oauth_metadata(event):
 
 
 def handle_protected_resource_metadata(event):
-    """Serve OAuth Protected Resource Metadata (RFC 9728).
+    """Proxy OAuth Protected Resource Metadata from Gateway."""
+    gateway_base = GATEWAY_URL.rstrip("/").replace("/mcp", "")
+    # metadata_url = f"{gateway_base}/.well-known/oauth-protected-resource"
 
-    The proxy acts as the MCP server from the client's perspective, so the
-    resource identifier must be the proxy URL (API Gateway), not the underlying
-    AgentCore Gateway URL. This ensures the 'resource' parameter in OAuth token
-    requests matches this metadata, avoiding resource mismatch errors.
+    # try:
+    #     req = urllib.request.Request(metadata_url)
+    #     with urllib.request.urlopen(req, timeout=10) as resp:
+    #         if resp.status == 200:
+    #             return json_response(200, json.loads(resp.read().decode()))
+    # except Exception as e:
+    #     print(f"Error fetching Gateway metadata: {e}")
 
-    Note: We intentionally do NOT proxy the AgentCore Gateway's metadata here
-    because that would return the Gateway URL as the resource, causing a mismatch
-    when the client (VS Code) uses the proxy URL in its token requests.
-    """
+    # Fallback
     api_url = get_api_url(event)
     return json_response(
         200,
         {
             "resource": api_url,
             "authorization_servers": [api_url],
-            "bearer_methods_supported": ["header"],
-            "scopes_supported": ["openid", "profile", "email"],
         },
     )
 
@@ -202,6 +211,7 @@ def handle_dcr(event):
             "client_id": CLIENT_ID,
             "client_name": "VS Code Copilot MCP Client",
             "grant_types": ["authorization_code", "refresh_token"],
+            "redirect_uris": [f"{get_api_url(event)}/callback"],
             "response_types": ["code"],
             "token_endpoint_auth_method": "none",
         },
@@ -209,17 +219,18 @@ def handle_dcr(event):
 
 
 def proxy_to_gateway(event):
+    print("proxy_to_gateway")
     """Forward MCP requests to AgentCore Gateway."""
     path = event.get("rawPath", event.get("path", "/"))
     method = event.get("requestContext", {}).get("http", {}).get("method", "GET")
     headers = event.get("headers", {})
     body = event.get("body", "")
-
+    print(json.dumps(headers))
     if event.get("isBase64Encoded") and body:
         body = base64.b64decode(body)
 
-    target_url = f"{GATEWAY_URL.rstrip('/')}{path}" if path != "/" else GATEWAY_URL
-
+    # target_url = f"{GATEWAY_URL.rstrip('/mcp')}{path}" if path != "/" else GATEWAY_URL
+    target_url = GATEWAY_URL
     # Build request headers
     req_headers = {
         "Content-Type": headers.get("content-type", "application/json"),
@@ -235,7 +246,8 @@ def proxy_to_gateway(event):
     for h in ["mcp-protocol-version", "mcp-session-id"]:
         if headers.get(h):
             req_headers[h.title()] = headers[h]
-
+    req_headers["Mcp-Protocol-Version"] = "2025-11-25"
+    print(json.dumps(req_headers))
     try:
         if method == "POST" and body:
             data = body.encode() if isinstance(body, str) else body
@@ -246,8 +258,19 @@ def proxy_to_gateway(event):
         for k, v in req_headers.items():
             req.add_header(k, v)
 
+        print(
+            "{}\n{}\r\n{}\r\n\r\n{}".format(
+                "-----------START-----------",
+                (req.method or "GET") + " " + req.full_url,
+                "\r\n".join("{}: {}".format(k, v) for k, v in req.headers.items()),
+                req.data,
+            )
+        )
+
         with urllib.request.urlopen(req, timeout=60) as resp:
             resp_body = resp.read().decode()
+            print(resp_body)
+            print(resp.headers)
             resp_headers = {
                 "Content-Type": resp.headers.get("Content-Type", "application/json")
             }
@@ -260,8 +283,19 @@ def proxy_to_gateway(event):
             # Check for 3LO elicitation and store token
             try:
                 data = json.loads(resp_body)
+                print(data)
                 if is_elicitation(data) and CALLBACK_LAMBDA_URL:
                     store_token_for_3lo(req_headers.get("Authorization", ""))
+                    # elicitation = data["error"]["data"]["elicitations"][0]
+
+                    # resp_body = json.dumps(
+                    #                         {
+                    #     "jsonrpc": "2.0",
+                    #     "id": data['id'],
+                    #     "method": "elicitation/create",
+                    #     "params": elicitation
+                    #     }
+                    # )
             except (json.JSONDecodeError, KeyError):
                 pass
 
@@ -271,13 +305,15 @@ def proxy_to_gateway(event):
                 "body": resp_body,
             }
     except urllib.error.HTTPError as e:
+        error = e.read().decode()
+        print(error)
         resp_headers = {"Content-Type": "application/json"}
         if e.headers.get("WWW-Authenticate"):
             resp_headers["WWW-Authenticate"] = e.headers["WWW-Authenticate"]
         return {
             "statusCode": e.code,
             "headers": resp_headers,
-            "body": e.read().decode(),
+            "body": error,
         }
     except Exception as e:
         return json_response(502, {"error": {"code": -32603, "message": str(e)}})

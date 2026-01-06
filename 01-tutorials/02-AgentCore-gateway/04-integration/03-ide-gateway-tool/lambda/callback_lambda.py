@@ -77,7 +77,7 @@ def handle_oauth_callback(event):
         </head>
         <body>
             <div class="container">
-                <h1>✓ OAuth2 3LO flow completed successfully</h1>
+                <h1>OAuth2 3LO flow completed successfully</h1>
                 <p>You can close this window and retry the tool in VS Code.</p>
             </div>
         </body>
