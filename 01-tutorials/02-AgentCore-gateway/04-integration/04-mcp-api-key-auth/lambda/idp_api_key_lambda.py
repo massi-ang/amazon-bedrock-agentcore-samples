@@ -63,8 +63,11 @@ def handle_token(event):
             "headers": {"Content-Type": "application/json"},
             "body": json.dumps({"error": "invalid_client"}),
         }
-
-    return json_response(200, {"access_token": os.environ.get("API_KEY", "MOCK")})
+    provider = params["provider"]
+    ## use provider to determine the API to return
+    return json_response(
+        200, {"access_token": os.environ.get(f"API_KEY_{provider.upper()}", "MOCK")}
+    )
 
 
 def get_api_url(event):

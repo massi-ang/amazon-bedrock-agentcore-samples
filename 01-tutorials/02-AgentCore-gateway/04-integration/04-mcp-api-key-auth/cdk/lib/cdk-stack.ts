@@ -37,7 +37,8 @@ export class CdkStack extends cdk.Stack {
       environment: {
         CLIENT_ID: "abc",
         CLIENT_SECRET: "abc",
-        API_KEY: "my-apy-key",
+        API_KEY_ATLASSIAN: "my-apy-key-1",
+        API_KEY_CORALOGIX: "my-apy-key-2",
       },
     });
 
