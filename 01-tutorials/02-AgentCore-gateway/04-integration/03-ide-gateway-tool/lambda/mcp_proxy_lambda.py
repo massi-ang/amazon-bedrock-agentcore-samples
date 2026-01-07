@@ -11,6 +11,9 @@ import base64
 import urllib.request
 import urllib.parse
 import urllib.error
+from botocore.auth import SigV4Auth
+from botocore.awsrequest import AWSRequest
+import boto3
 
 # Configuration from environment variables
 GATEWAY_URL = os.environ.get("GATEWAY_URL", "")
@@ -18,6 +21,25 @@ COGNITO_DOMAIN = os.environ.get("COGNITO_DOMAIN", "")
 CLIENT_ID = os.environ.get("CLIENT_ID", "")
 CLIENT_SECRET = os.environ.get("CLIENT_SECRET", "")
 CALLBACK_LAMBDA_URL = os.environ.get("CALLBACK_LAMBDA_URL", "")
+
+
+def sign_request(request):
+    """Sign an HTTP request with AWS SigV4."""
+    session = boto3.Session()
+    credentials = session.get_credentials()
+    region = session.region_name or "us-east-1"
+
+    aws_request = AWSRequest(
+        method=request.get_method(),
+        url=request.get_full_url(),
+        data=request.data,
+        headers=request.headers,
+    )
+    SigV4Auth(credentials, "bedrock-agentcore", region).add_auth(aws_request)
+
+    # Update original request headers
+    for key, value in aws_request.headers.items():
+        request.add_header(key, value)
 
 
 def lambda_handler(event, context):
@@ -237,16 +259,12 @@ def proxy_to_gateway(event):
         "Accept": headers.get("accept", "application/json"),
     }
 
-    # Forward auth header
-    auth = headers.get("authorization")
-    if auth:
-        req_headers["Authorization"] = auth
-
     # Forward MCP headers
     for h in ["mcp-protocol-version", "mcp-session-id"]:
         if headers.get(h):
             req_headers[h.title()] = headers[h]
     req_headers["Mcp-Protocol-Version"] = "2025-11-25"
+
     print(json.dumps(req_headers))
     try:
         if method == "POST" and body:
@@ -257,6 +275,21 @@ def proxy_to_gateway(event):
 
         for k, v in req_headers.items():
             req.add_header(k, v)
+
+        # This code is here in case ACG will support 3LO outbound with IAM auth in the future
+        if os.environ.get("GATEWAY_AUTH", None) == "IAM":
+            # Extract the userId from the inbound authorization token
+            auth = headers.get("authorization")
+            if auth:
+                token = auth.split(" ")[1]
+                user_id = json.loads(base64.b64decode(token.split(".")[1]))["sub"]
+                req.add_header("X-Amzn-Bedrock-AgentCore-Runtime-User-Id", user_id)
+            sign_request(req)
+        else:
+            # Forward auth header
+            auth = headers.get("authorization")
+            if auth:
+                req.add_header("Authorization", auth)
 
         print(
             "{}\n{}\r\n{}\r\n\r\n{}".format(
@@ -285,17 +318,8 @@ def proxy_to_gateway(event):
                 data = json.loads(resp_body)
                 print(data)
                 if is_elicitation(data) and CALLBACK_LAMBDA_URL:
-                    store_token_for_3lo(req_headers.get("Authorization", ""))
-                    # elicitation = data["error"]["data"]["elicitations"][0]
+                    store_token_for_3lo(req.headers.get("Authorization", ""))
 
-                    # resp_body = json.dumps(
-                    #                         {
-                    #     "jsonrpc": "2.0",
-                    #     "id": data['id'],
-                    #     "method": "elicitation/create",
-                    #     "params": elicitation
-                    #     }
-                    # )
             except (json.JSONDecodeError, KeyError):
                 pass
 
