@@ -13,7 +13,7 @@ export class CdkStack extends cdk.Stack {
     super(scope, id, props);
 
     // =============================================================================
-    // LAMBDA FUNCTIONS
+    // LAMBDA FUNCTION
     // =============================================================================
 
     // MCP Proxy Lambda
