@@ -4,6 +4,7 @@ import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as apigateway from "aws-cdk-lib/aws-apigatewayv2";
 import * as integrations from "aws-cdk-lib/aws-apigatewayv2-integrations";
 import * as iam from "aws-cdk-lib/aws-iam";
+import * as ssm from "aws-cdk-lib/aws-ssm";
 import { Construct } from "constructs";
 import * as path from "path";
 import * as agentcore from "@aws-cdk/aws-bedrock-agentcore-alpha";
@@ -11,6 +12,51 @@ import * as agentcore from "@aws-cdk/aws-bedrock-agentcore-alpha";
 export class CdkStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
+
+    // =============================================================================
+    // PARAMETER STORE - SECURE CREDENTIAL STORAGE
+    // =============================================================================
+
+    // Create SecureString parameters for storing credentials
+    const clientIdParam = new ssm.StringParameter(this, "ClientIdParam", {
+      parameterName: `/agentcore-mcp-gateway/${this.stackName}/credentials/client-id`,
+      stringValue: "PLACEHOLDER_REPLACE_ME",
+      type: ssm.ParameterType.SECURE_STRING,
+      description: "OAuth Client ID for MCP Gateway",
+    });
+
+    const clientSecretParam = new ssm.StringParameter(
+      this,
+      "ClientSecretParam",
+      {
+        parameterName: `/agentcore-mcp-gateway/${this.stackName}/credentials/client-secret`,
+        stringValue: "PLACEHOLDER_REPLACE_ME",
+        type: ssm.ParameterType.SECURE_STRING,
+        description: "OAuth Client Secret for MCP Gateway",
+      }
+    );
+
+    const atlassianApiKeyParam = new ssm.StringParameter(
+      this,
+      "AtlassianApiKeyParam",
+      {
+        parameterName: `/agentcore-mcp-gateway/${this.stackName}/credentials/api-key-atlassian`,
+        stringValue: "PLACEHOLDER_REPLACE_ME",
+        type: ssm.ParameterType.SECURE_STRING,
+        description: "Atlassian API Key for MCP Gateway",
+      }
+    );
+
+    const coralogixApiKeyParam = new ssm.StringParameter(
+      this,
+      "CoralogixApiKeyParam",
+      {
+        parameterName: `/agentcore-mcp-gateway/${this.stackName}/credentials/api-key-coralogix`,
+        stringValue: "PLACEHOLDER_REPLACE_ME",
+        type: ssm.ParameterType.SECURE_STRING,
+        description: "Coralogix API Key for MCP Gateway",
+      }
+    );
 
     // =============================================================================
     // LAMBDA FUNCTION
@@ -35,12 +81,20 @@ export class CdkStack extends cdk.Stack {
       timeout: cdk.Duration.seconds(60),
       memorySize: 256,
       environment: {
-        CLIENT_ID: "abc",
-        CLIENT_SECRET: "abc",
-        API_KEY_ATLASSIAN: "my-apy-key-1",
-        API_KEY_CORALOGIX: "my-apy-key-2",
+        STACK_NAME: this.stackName,
       },
     });
+
+    // Grant Lambda permission to read Parameter Store parameters
+    idpLambda.addToRolePolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: ["ssm:GetParameter", "ssm:GetParameters"],
+        resources: [
+          `arn:aws:ssm:${this.region}:${this.account}:parameter/agentcore-mcp-gateway/${this.stackName}/credentials/*`,
+        ],
+      })
+    );
 
     // =============================================================================
     // API GATEWAY

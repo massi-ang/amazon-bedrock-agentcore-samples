@@ -66,7 +66,7 @@ export class CdkStack extends cdk.Stack {
         identifier: "agentcore-gateway",
         userPoolResourceServerName: "AgentCore Gateway",
         scopes: [readScope, writeScope],
-      }
+      },
     );
 
     const mcpScopes = [
@@ -96,7 +96,7 @@ export class CdkStack extends cdk.Stack {
       assumedBy: new iam.ServicePrincipal("lambda.amazonaws.com"),
       managedPolicies: [
         iam.ManagedPolicy.fromAwsManagedPolicyName(
-          "service-role/AWSLambdaBasicExecutionRole"
+          "service-role/AWSLambdaBasicExecutionRole",
         ),
         iam.ManagedPolicy.fromAwsManagedPolicyName("AmazonBedrockFullAccess"),
       ],
@@ -111,7 +111,7 @@ export class CdkStack extends cdk.Stack {
           "bedrock-agentcore:GetResourceOauth2Token",
         ],
         resources: ["*"],
-      })
+      }),
     );
 
     lambdaRole.addToPolicy(
@@ -119,7 +119,7 @@ export class CdkStack extends cdk.Stack {
         effect: iam.Effect.ALLOW,
         actions: ["bedrock-agentcore:InvokeGateway"],
         resources: ["*"],
-      })
+      }),
     );
 
     lambdaRole.addToPolicy(
@@ -127,7 +127,7 @@ export class CdkStack extends cdk.Stack {
         effect: iam.Effect.ALLOW,
         actions: ["secretsmanager:GetSecretValue"],
         resources: ["*"],
-      })
+      }),
     );
 
     // MCP Proxy Lambda
@@ -141,7 +141,7 @@ export class CdkStack extends cdk.Stack {
             "bash",
             "-c",
             ["cp mcp_proxy_lambda.py /asset-output/lambda_function.py"].join(
-              " && "
+              " && ",
             ),
           ],
         },
@@ -201,12 +201,12 @@ export class CdkStack extends cdk.Stack {
     // Create Lambda integrations
     const proxyIntegration = new integrations.HttpLambdaIntegration(
       "ProxyIntegration",
-      proxyLambda
+      proxyLambda,
     );
 
     const callbackIntegration = new integrations.HttpLambdaIntegration(
       "CallbackIntegration",
-      callbackLambda
+      callbackLambda,
     );
 
     // Add routes
@@ -279,6 +279,8 @@ export class CdkStack extends cdk.Stack {
       "http://127.0.0.1:33418/",
       "http://localhost:33418",
       "http://localhost:33418/",
+      "http://localhost:8123/oauth/callback",
+      "http://127.0.0.1:8123/oauth/callback",
       `${apiEndpoint}callback`,
       `${apiEndpoint}callback/`,
       "https://vscode.dev/redirect",
@@ -314,11 +316,11 @@ export class CdkStack extends cdk.Stack {
       `https://cognito-idp.${this.region}.amazonaws.com/${userPool.userPoolId}`,
 
       {
-        httpApi: httpApi,
-        type: apigateway.HttpAuthorizerType.JWT,
+        authorizerName: "lambda",
+        // type: apigateway.HttpAuthorizerType.JWT,
         identitySource: ["$request.header.Authorization"],
         jwtAudience: [vscodeClient.userPoolClientId],
-      }
+      },
     );
 
     httpApi.addRoutes({
@@ -333,12 +335,12 @@ export class CdkStack extends cdk.Stack {
     proxyLambda.addEnvironment("CLIENT_ID", vscodeClient.userPoolClientId);
     proxyLambda.addEnvironment(
       "CALLBACK_LAMBDA_URL",
-      apiEndpoint.replace(/\/$/, "")
+      apiEndpoint.replace(/\/$/, ""),
     );
 
     const gatewayRole = new iam.Role(this, "GatewayRole", {
       assumedBy: iam.ServicePrincipal.fromStaticServicePrincipleName(
-        "bedrock-agentcore.amazonaws.com"
+        "bedrock-agentcore.amazonaws.com",
       ),
       inlinePolicies: {
         getAccessToken: new iam.PolicyDocument({
@@ -348,6 +350,7 @@ export class CdkStack extends cdk.Stack {
                 "bedrock-agentcore:GetWorkloadAccess*",
                 "bedrock-agentcore:GetResourceOauth2Token",
                 "secretsmanager:GetSecretValue",
+                "kms:Decrypt",
               ],
               resources: ["*"],
               effect: iam.Effect.ALLOW,
@@ -434,6 +437,10 @@ export class CdkStack extends cdk.Stack {
       description: "Callback Lambda Function Name",
     });
 
+    new cdk.CfnOutput(this, "GatewayUrl", {
+      value: gateway.gatewayUrl ?? "",
+    });
+
     new cdk.CfnOutput(this, "VSCodeMcpConfig", {
       value: JSON.stringify(
         {
@@ -448,9 +455,13 @@ export class CdkStack extends cdk.Stack {
           },
         },
         null,
-        2
+        2,
       ),
       description: "VS Code MCP Configuration (add to .vscode/mcp.json)",
+    });
+
+    new cdk.CfnOutput(this, "ClientId", {
+      value: `${vscodeClient.userPoolClientId}`,
     });
 
     new cdk.CfnOutput(this, "Gateway", {
