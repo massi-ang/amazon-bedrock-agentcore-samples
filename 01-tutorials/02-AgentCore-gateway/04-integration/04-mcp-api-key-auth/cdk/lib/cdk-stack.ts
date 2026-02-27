@@ -21,7 +21,6 @@ export class CdkStack extends cdk.Stack {
     const clientIdParam = new ssm.StringParameter(this, "ClientIdParam", {
       parameterName: `/agentcore-mcp-gateway/${this.stackName}/credentials/client-id`,
       stringValue: "PLACEHOLDER_REPLACE_ME",
-      type: ssm.ParameterType.SECURE_STRING,
       description: "OAuth Client ID for MCP Gateway",
     });
 
@@ -31,9 +30,8 @@ export class CdkStack extends cdk.Stack {
       {
         parameterName: `/agentcore-mcp-gateway/${this.stackName}/credentials/client-secret`,
         stringValue: "PLACEHOLDER_REPLACE_ME",
-        type: ssm.ParameterType.SECURE_STRING,
         description: "OAuth Client Secret for MCP Gateway",
-      }
+      },
     );
 
     const atlassianApiKeyParam = new ssm.StringParameter(
@@ -42,9 +40,8 @@ export class CdkStack extends cdk.Stack {
       {
         parameterName: `/agentcore-mcp-gateway/${this.stackName}/credentials/api-key-atlassian`,
         stringValue: "PLACEHOLDER_REPLACE_ME",
-        type: ssm.ParameterType.SECURE_STRING,
         description: "Atlassian API Key for MCP Gateway",
-      }
+      },
     );
 
     const coralogixApiKeyParam = new ssm.StringParameter(
@@ -53,9 +50,8 @@ export class CdkStack extends cdk.Stack {
       {
         parameterName: `/agentcore-mcp-gateway/${this.stackName}/credentials/api-key-coralogix`,
         stringValue: "PLACEHOLDER_REPLACE_ME",
-        type: ssm.ParameterType.SECURE_STRING,
         description: "Coralogix API Key for MCP Gateway",
-      }
+      },
     );
 
     // =============================================================================
@@ -73,7 +69,7 @@ export class CdkStack extends cdk.Stack {
             "bash",
             "-c",
             ["cp idp_api_key_lambda.py /asset-output/lambda_function.py"].join(
-              " && "
+              " && ",
             ),
           ],
         },
@@ -93,7 +89,7 @@ export class CdkStack extends cdk.Stack {
         resources: [
           `arn:aws:ssm:${this.region}:${this.account}:parameter/agentcore-mcp-gateway/${this.stackName}/credentials/*`,
         ],
-      })
+      }),
     );
 
     // =============================================================================
@@ -117,7 +113,7 @@ export class CdkStack extends cdk.Stack {
     // Create Lambda integrations
     const idpIntegration = new integrations.HttpLambdaIntegration(
       "ProxyIntegration",
-      idpLambda
+      idpLambda,
     );
 
     // Add routes
@@ -147,7 +143,7 @@ export class CdkStack extends cdk.Stack {
 
     const gatewayRole = new iam.Role(this, "GatewayRole", {
       assumedBy: iam.ServicePrincipal.fromStaticServicePrincipleName(
-        "bedrock-agentcore.amazonaws.com"
+        "bedrock-agentcore.amazonaws.com",
       ),
       inlinePolicies: {
         getAccessToken: new iam.PolicyDocument({
